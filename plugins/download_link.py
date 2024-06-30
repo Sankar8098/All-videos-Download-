@@ -11,8 +11,7 @@ import youtube_dl
 from config import Config
 from helper.utils import (
     get_thumbnail_url,
-    ytdl_downloads,
-    get_porn_thumbnail_url
+    get_porn_thumbnail_url  # Assuming you have implemented this function in your helper module
 )
 
 class Downloader:
@@ -25,11 +24,6 @@ class Downloader:
             f"**{index+1}. Link:-** {self.queue_links[user_id][index]}\n\nDownloading... Please Have Patience\nLoading...",
             disable_web_page_preview=True
         )
-
-        if self.queue_links[user_id][index].startswith("https://www.pornhub"):
-            thumbnail = get_porn_thumbnail_url(self.queue_links[user_id][index])
-        else:
-            thumbnail = get_thumbnail_url(self.queue_links[user_id][index])
 
         ytdl_opts = {
             'format': 'best',
@@ -89,7 +83,7 @@ class Downloader:
                 progress=progress_for_pyrogram,
                 progress_args=(msg, time.time())
             )
-            os.remove(thumbnail_filename)
+            os.remove(thumbnail_filename)  # Remove the temporary thumbnail file after upload
         else:
             await bot.send_video(
                 chat_id=user_id,
@@ -99,7 +93,7 @@ class Downloader:
                 progress=progress_for_pyrogram,
                 progress_args=(msg, time.time())
             )
-        os.remove(video_file)
+        os.remove(video_file)  # Remove the downloaded video file after upload
 
 downloader = Downloader()
 
@@ -110,7 +104,7 @@ async def handle_yt_dl(bot: Client, cmd: Message):
 @Client.on_callback_query(filters.regex('^http_link'))
 async def handle_single_download(bot: Client, update: CallbackQuery):
     http_link = update.message.reply_to_message.text
-    await ytdl_downloads(bot, update, http_link)
+    await ytdl_downloads(bot, update, http_link)  # Assuming ytdl_downloads handles single link downloads
 
 @Client.on_callback_query(filters.regex('^multiple_http_link'))
 async def handle_multiple_download(bot: Client, update: CallbackQuery):
