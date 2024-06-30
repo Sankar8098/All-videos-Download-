@@ -2,6 +2,7 @@ aiohttp
 dnspython
 motor
 Pyrogram
+tenacity
 pyromod
 pornhub-api==0.2.0
 TgCrypto
