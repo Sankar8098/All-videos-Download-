@@ -5,11 +5,11 @@ import time
 import uuid
 import math
 import requests
-import moviepy
-from moviepy.editor import VideoFileClip
+from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 import youtube_dl
+from moviepy.editor import VideoFileClip  # Import VideoFileClip from moviepy.editor
 from config import Config
 from helper.utils import (
     get_thumbnail_url,
@@ -43,7 +43,7 @@ class Downloader:
                 if index < len(self.queue_links[user_id]):
                     await self.download_multiple(bot, update, link_msg, index)
                 else:
-                    await update.message.reply_text("All Links Downloaded Successfully ✅", reply_to_message_id=link_msg.id)
+                    await update.message.reply_text("All Links Downloaded Successfully ✅", reply_to_message_id=link_msg.message_id)
                 return
 
         unique_id = uuid.uuid4().hex
@@ -71,27 +71,20 @@ class Downloader:
         if index < len(self.queue_links[user_id]):
             await self.download_multiple(bot, update, link_msg, index)
         else:
-            await update.message.reply_text("All Links Downloaded Successfully ✅", reply_to_message_id=link_msg.id)
+            await update.message.reply_text("All Links Downloaded Successfully ✅", reply_to_message_id=link_msg.message_id)
 
-    async def send_video(client, file_path, thumbnail_path, video_title, reply_msg, collection_channel_id, user_mention, user_id, message):
-    file_size = os.path.getsize(file_path)
-    uploaded = 0
-    start_time = datetime.now()
-    last_update_time = time.time()
-
-    try:
-        duration = 0
-        path = str(file_path)
-        clip = VideoFileClip(path)
-        duration = int(clip.duration)
-        clip.close()
-    except Exception as e:
-        logging.warning(f"can't add duration: {e}")
-        duration = 0
-        
-    hours, remainder = divmod(duration, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    conv_duration = f"{hours:02}:{minutes:02}:{seconds:02}"
+    async def send_video(self, bot, update, video_file, thumbnail_filename, msg, duration):
+        user_id = update.from_user.id
+        if thumbnail_filename:
+            await bot.send_video(
+                chat_id=user_id,
+                video=video_file,
+                thumb=thumbnail_filename,
+                caption=f"Video Name: `{video_file}`\n\nRequested Video",
+                duration=duration,
+                progress=progress_for_pyrogram,
+                progress_args=(msg, time.time())
+            )
             os.remove(thumbnail_filename)  # Remove the temporary thumbnail file after upload
         else:
             await bot.send_video(
