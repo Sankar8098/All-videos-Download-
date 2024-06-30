@@ -167,7 +167,7 @@ async def ytdl_downloads(bot, update, http_link):
     loop = asyncio.get_event_loop()
     with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
         try:
-            await loop.run_in_executor(None, ydl.download, [http_link])
+            info_dict = ydl.extract_info(http_link, download=True)
         except DownloadError:
             await msg.edit("Sorry, There was a problem with that particular video")
             return
@@ -182,21 +182,39 @@ async def ytdl_downloads(bot, update, http_link):
             with open(thumbnail_filename, 'wb') as f:
                 f.write(response.content)
 
+    video_file = None
     for file in os.listdir('.'):
         if file.endswith(".mp4") or file.endswith('.mkv'):
-            try:
-                if thumbnail:
-                    await bot.send_video(chat_id=update.from_user.id, video=f"{file}", thumb=thumbnail_filename, caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}", progress=progress_for_pyrogram, progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time()))
-                    os.remove(f"{file}")
-                    os.remove(thumbnail_filename)
-                    break
-                else:
-                    await bot.send_video(chat_id=update.from_user.id, video=f"{file}", caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}", progress=progress_for_pyrogram, progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time()))
-                    os.remove(f"{file}")
-            except Exception as e:
-                await msg.edit(e)
-                break
-        else:
-            continue
+            video_file = file
+            break
+
+    if video_file:
+        video_duration = info_dict.get('duration', 0)
+        try:
+            if thumbnail:
+                await bot.send_video(
+                    chat_id=update.from_user.id,
+                    video=video_file,
+                    thumb=thumbnail_filename,
+                    caption=f"**📁 File Name:- `{video_file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                    duration=video_duration,
+                    progress=progress_for_pyrogram,
+                    progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                )
+                os.remove(video_file)
+                os.remove(thumbnail_filename)
+            else:
+                await bot.send_video(
+                    chat_id=update.from_user.id,
+                    video=video_file,
+                    caption=f"**📁 File Name:- `{video_file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                    duration=video_duration,
+                    progress=progress_for_pyrogram,
+                    progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                )
+                os.remove(video_file)
+        except Exception as e:
+            await msg.edit(str(e))
 
     await msg.delete()
+    
