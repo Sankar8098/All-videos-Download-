@@ -5,6 +5,8 @@ import time
 import uuid
 import math
 import requests
+import moviepy
+from moviepy.editor import VideoFileClip
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 import youtube_dl
