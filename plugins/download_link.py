@@ -73,18 +73,25 @@ class Downloader:
         else:
             await update.message.reply_text("All Links Downloaded Successfully ✅", reply_to_message_id=link_msg.id)
 
-    async def send_video(self, bot, update, video_file, thumbnail_filename, msg, duration):
-        user_id = update.from_user.id
-        if thumbnail_filename:
-            await bot.send_video(
-                chat_id=user_id,
-                video=video_file,
-                thumb=thumbnail_filename,
-                caption=f"Video Name: `{video_file}`\n\nRequested Video",
-                duration=duration,
-                progress=progress_for_pyrogram,
-                progress_args=(msg, time.time())
-            )
+    async def send_video(client, file_path, thumbnail_path, video_title, reply_msg, collection_channel_id, user_mention, user_id, message):
+    file_size = os.path.getsize(file_path)
+    uploaded = 0
+    start_time = datetime.now()
+    last_update_time = time.time()
+
+    try:
+        duration = 0
+        path = str(file_path)
+        clip = VideoFileClip(path)
+        duration = int(clip.duration)
+        clip.close()
+    except Exception as e:
+        logging.warning(f"can't add duration: {e}")
+        duration = 0
+        
+    hours, remainder = divmod(duration, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    conv_duration = f"{hours:02}:{minutes:02}:{seconds:02}"
             os.remove(thumbnail_filename)  # Remove the temporary thumbnail file after upload
         else:
             await bot.send_video(
