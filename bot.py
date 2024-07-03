@@ -1,6 +1,5 @@
 import logging
 import logging.config
-from pyrogram import Client
 from pyrogram import Client, __version__
 from pyrogram.raw.all import layer
 from config import Config
@@ -9,6 +8,7 @@ from pytz import timezone
 from datetime import datetime
 from plugins.web_support import web_server
 import pyromod
+import asyncio
 
 logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
@@ -43,8 +43,8 @@ class Bot(Client):
         for id in Config.ADMIN:
             try:
                 await self.send_message(id, f"**__{me.first_name}  Iꜱ Sᴛᴀʀᴛᴇᴅ.....✨️__**")
-            except:
-                pass
+            except Exception as e:
+                logging.error(f"Failed to send start message to admin: {e}")
 
         if Config.LOG_CHANNEL:
             try:
@@ -52,13 +52,19 @@ class Bot(Client):
                 date = curr.strftime('%d %B, %Y')
                 time = curr.strftime('%I:%M:%S %p')
                 await self.send_message(Config.LOG_CHANNEL, f"**__{me.mention} Iꜱ Rᴇsᴛᴀʀᴛᴇᴅ !!**\n\n📅 Dᴀᴛᴇ : `{date}`\n⏰ Tɪᴍᴇ : `{time}`\n🌐 Tɪᴍᴇᴢᴏɴᴇ : `Asia/Kolkata`\n\n🉐 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`</b>")
-            except:
-                print("Pʟᴇᴀꜱᴇ Mᴀᴋᴇ Tʜɪꜱ Iꜱ Aᴅᴍɪɴ Iɴ Yᴏᴜʀ Lᴏɢ Cʜᴀɴɴᴇʟ")
+            except Exception as e:
+                logging.error(f"Please make sure this bot is an admin in your log channel: {e}")
 
     async def stop(self, *args):
         await super().stop()
         logging.info("Bot Stopped 🙄")
 
 
-bot = Bot()
-bot.run()
+async def main():
+    bot = Bot()
+    await bot.start()
+    await asyncio.sleep(1e6)  # To keep the bot running
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
