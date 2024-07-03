@@ -35,19 +35,21 @@ class Downloader:
 
         ytdl_opts = {
             'format': 'best',
-            # 'progress_hooks': [lambda d: download_progress_hook(d, msg, self.queue_links[user_id][index])]
+            'progress_hooks': [lambda d: download_progress_hook(d, msg, self.queue_links[user_id][index])]
         }
 
+        filename = None
         with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
             try:
-                ydl.download([self.queue_links[user_id][index]])
+                info_dict = ydl.extract_info(self.queue_links[user_id][index], download=True)
+                filename = ydl.prepare_filename(info_dict)
             except youtube_dl.utils.DownloadError as e:
                 await msg.edit(f"Sorry, There was a problem with that particular video: {e}")
                 index += 1
                 if index < len(self.queue_links[user_id]):
                     await self.download_multiple(bot, update, link_msg, index)
                 else:
-                    await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝐶𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
+                    await update.message.reply_text(f"ALL LINKS DOWNLOADED SUCCESSFULLY ✅", reply_to_message_id=link_msg.id)
                 return
 
         # Generate a unique filename for the thumbnail
@@ -64,14 +66,11 @@ class Downloader:
 
         await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
 
-        for file in os.listdir('.'):
-            if file.endswith(".mp4") or file.endswith('.mkv'):
-                try:
-                    await self.send_video(bot, update, file, thumbnail_filename, msg)
-                    break
-                except Exception as e:
-                    print("⚠️  ERROR:- ", e)
-                    break
+        if filename:
+            try:
+                await self.send_video(bot, update, filename, thumbnail_filename, msg)
+            except Exception as e:
+                print("⚠️ ERROR:- ", e)
 
         await msg.delete()
 
@@ -80,9 +79,9 @@ class Downloader:
             await self.download_multiple(bot, update, link_msg, index)
         else:
             try:
-                await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝐶𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
+                await update.message.reply_text(f"ALL LINKS DOWNLOADED SUCCESSFULLY ✅", reply_to_message_id=link_msg.id)
             except:
-                await update.message.reply_text("**𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝐶𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅**")
+                await update.message.reply_text("ALL LINKS DOWNLOADED SUCCESSFULLY ✅")
 
     async def send_video(self, bot, update, file, thumbnail_filename, msg):
         user_id = update.from_user.id
@@ -156,4 +155,3 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
     except Exception as e:
         print('Error on line {}'.format(
             sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
-
