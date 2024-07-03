@@ -27,6 +27,7 @@ class Bot(Client):
             plugins={"root": "plugins"},
             sleep_threshold=15,
         )
+        self.stop_event = asyncio.Event()
 
     async def start(self):
         await super().start()
@@ -59,11 +60,14 @@ class Bot(Client):
         await super().stop()
         logging.info("Bot Stopped 🙄")
 
+    async def run(self):
+        await self.start()
+        await self.stop_event.wait()
+
 
 async def main():
     bot = Bot()
-    await bot.start()
-    await bot.idle()
+    await bot.run()
 
 if __name__ == "__main__":
     asyncio.run(main())
