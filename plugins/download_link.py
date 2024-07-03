@@ -45,8 +45,10 @@ class Downloader:
                 with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
                     info_dict = ydl.extract_info(link, download=True)
                     filename = ydl.prepare_filename(info_dict)
+                    if os.path.exists(filename):
+                        print(f"{filename} has already been downloaded")
             except youtube_dl.utils.DownloadError as e:
-                await msg.edit(f"Sorry, There was a problem with that particular video: {e}")
+                await msg.edit(f"Sorry, there was a problem with that particular video: {e}")
                 index += 1
                 continue
 
