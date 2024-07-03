@@ -70,4 +70,6 @@ async def main():
     await bot.run()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Ensure that the asyncio event loop is used consistently
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
