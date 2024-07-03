@@ -6,7 +6,6 @@ import uuid
 import requests
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from youtube_dl import DownloadError
 import youtube_dl
 from config import Config
 from helper.utils import (
@@ -39,11 +38,8 @@ class Downloader:
             # 'progress_hooks': [lambda d: download_progress_hook(d, msg, self.queue_links[user_id][index])]
         }
 
-        # loop = asyncio.get_event_loop()
-
         with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
             try:
-                # await loop.run_in_executor(None, ydl.download, [self.queue_links[user_id][index]])
                 ydl.download([self.queue_links[user_id][index]])
             except youtube_dl.utils.DownloadError as e:
                 await msg.edit(f"Sorry, There was a problem with that particular video: {e}")
@@ -51,14 +47,14 @@ class Downloader:
                 if index < len(self.queue_links[user_id]):
                     await self.download_multiple(bot, update, link_msg, index)
                 else:
-                    await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
+                    await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝐶𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
                 return
 
         # Generate a unique filename for the thumbnail
         unique_id = uuid.uuid4().hex
         thumbnail_filename = None
         if thumbnail:
-            thumbnail_filename = f"p_hub_thumbnail_{unique_id}.jpg"
+            thumbnail_filename = f"thumbnail_{unique_id}.jpg"
 
             # Download the thumbnail image
             response = requests.get(thumbnail)
@@ -84,9 +80,9 @@ class Downloader:
             await self.download_multiple(bot, update, link_msg, index)
         else:
             try:
-                await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
+                await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝐶𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
             except:
-                await update.message.reply_text("**𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅**")
+                await update.message.reply_text("**𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝐶𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅**")
 
     async def send_video(self, bot, update, file, thumbnail_filename, msg):
         user_id = update.from_user.id
@@ -127,9 +123,6 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
 
     user_id = update.from_user.id
     try:
-        global queue_links
-        user_id = update.from_user.id
-
         if user_id not in downloader.queue_links:
             downloader.queue_links.update({user_id: [http_link]})
             await update.message.delete()
