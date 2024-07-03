@@ -157,16 +157,3 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
         print('Error on line {}'.format(
             sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
 
-
-if __name__ == "__main__":
-    # Initialize the bot
-    bot = Client("my_bot", api_id=Config.API_ID, api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN)
-
-    async def main():
-        await bot.start()
-        print("Bot started!")
-        await idle()  # Keep the bot running
-        await bot.stop()
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
