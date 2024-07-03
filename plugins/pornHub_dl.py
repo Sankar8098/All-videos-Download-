@@ -86,5 +86,6 @@ async def search(client, query: InlineQuery):
     await backend.close()
 
 # Start the bot
+"app.run()"
 
 # Start the bot
