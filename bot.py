@@ -1,5 +1,6 @@
 import logging
 import logging.config
+from pyrogram import Client
 from pyrogram import Client, __version__
 from pyrogram.raw.all import layer
 from config import Config
@@ -8,7 +9,6 @@ from pytz import timezone
 from datetime import datetime
 from plugins.web_support import web_server
 import pyromod
-import asyncio
 
 logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
@@ -27,7 +27,6 @@ class Bot(Client):
             plugins={"root": "plugins"},
             sleep_threshold=15,
         )
-        self.stop_event = asyncio.Event()
 
     async def start(self):
         await super().start()
@@ -44,8 +43,8 @@ class Bot(Client):
         for id in Config.ADMIN:
             try:
                 await self.send_message(id, f"**__{me.first_name}  Iꜱ Sᴛᴀʀᴛᴇᴅ.....✨️__**")
-            except Exception as e:
-                logging.error(f"Failed to send start message to admin: {e}")
+            except:
+                pass
 
         if Config.LOG_CHANNEL:
             try:
@@ -53,23 +52,13 @@ class Bot(Client):
                 date = curr.strftime('%d %B, %Y')
                 time = curr.strftime('%I:%M:%S %p')
                 await self.send_message(Config.LOG_CHANNEL, f"**__{me.mention} Iꜱ Rᴇsᴛᴀʀᴛᴇᴅ !!**\n\n📅 Dᴀᴛᴇ : `{date}`\n⏰ Tɪᴍᴇ : `{time}`\n🌐 Tɪᴍᴇᴢᴏɴᴇ : `Asia/Kolkata`\n\n🉐 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`</b>")
-            except Exception as e:
-                logging.error(f"Please make sure this bot is an admin in your log channel: {e}")
+            except:
+                print("Pʟᴇᴀꜱᴇ Mᴀᴋᴇ Tʜɪꜱ Iꜱ Aᴅᴍɪɴ Iɴ Yᴏᴜʀ Lᴏɢ Cʜᴀɴɴᴇʟ")
 
     async def stop(self, *args):
         await super().stop()
         logging.info("Bot Stopped 🙄")
 
-    async def run(self):
-        await self.start()
-        await self.stop_event.wait()
 
-
-async def main():
-    bot = Bot()
-    await bot.run()
-
-if __name__ == "__main__":
-    # Ensure that the asyncio event loop is used consistently
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+bot = Bot()
+bot.run()
