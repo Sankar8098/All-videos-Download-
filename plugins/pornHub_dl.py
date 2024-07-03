@@ -87,3 +87,5 @@ async def search(client, query: InlineQuery):
 
 # Start the bot
 
+# Start the bot
+app.run()
