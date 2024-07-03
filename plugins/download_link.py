@@ -22,88 +22,87 @@ class Downloader:
 
     async def download_multiple(self, bot, update, link_msg, index=0):
         user_id = update.from_user.id
-        msg = await update.message.reply_text(
-            f"**{index+1}. Link:-** {self.queue_links[user_id][index]}\n\nDownloading... Please Have Patience\n 𝙇𝙤𝙖𝙙𝙞𝙣𝙜...\n\n⚠️ **Please note that for multiple downloads, the progress may not be immediately apparent. Therefore, if it appears that nothing is downloading, please wait a few minutes as the downloads may be processing in the background. The duration of the download process can also vary depending on the content being downloaded, so we kindly ask for your patience.**",
-            disable_web_page_preview=True
-        )
+        while index < len(self.queue_links[user_id]):
+            link = self.queue_links[user_id][index]
+            msg = await update.message.reply_text(
+                f"**{index+1}. Link:-** {link}\n\nDownloading... Please Have Patience\n 𝙇𝙤𝙖𝙙𝙞𝙣𝙜...\n\n⚠️ **Please note that for multiple downloads, the progress may not be immediately apparent. Therefore, if it appears that nothing is downloading, please wait a few minutes as the downloads may be processing in the background. The duration of the download process can also vary depending on the content being downloaded, so we kindly ask for your patience.**",
+                disable_web_page_preview=True
+            )
 
-        # Set options for youtube-dl
-        if self.queue_links[user_id][index].startswith("https://www.pornhub"):
-            thumbnail = get_porn_thumbnail_url(self.queue_links[user_id][index])
-        else:
-            thumbnail = get_thumbnail_url(self.queue_links[user_id][index])
+            # Set options for youtube-dl
+            if link.startswith("https://www.pornhub"):
+                thumbnail = get_porn_thumbnail_url(link)
+            else:
+                thumbnail = get_thumbnail_url(link)
 
-        ytdl_opts = {
-            'format': 'best',
-            'progress_hooks': [lambda d: download_progress_hook(d, msg, self.queue_links[user_id][index])]
-        }
+            ytdl_opts = {
+                'format': 'best',
+                'progress_hooks': [lambda d: download_progress_hook(d, msg, link)]
+            }
 
-        filename = None
-        with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
+            filename = None
             try:
-                info_dict = ydl.extract_info(self.queue_links[user_id][index], download=True)
-                filename = ydl.prepare_filename(info_dict)
+                with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
+                    info_dict = ydl.extract_info(link, download=True)
+                    filename = ydl.prepare_filename(info_dict)
             except youtube_dl.utils.DownloadError as e:
                 await msg.edit(f"Sorry, There was a problem with that particular video: {e}")
                 index += 1
-                if index < len(self.queue_links[user_id]):
-                    await self.download_multiple(bot, update, link_msg, index)
-                else:
-                    await update.message.reply_text(f"ALL LINKS DOWNLOADED SUCCESSFULLY ✅", reply_to_message_id=link_msg.id)
-                return
+                continue
 
-        # Generate a unique filename for the thumbnail
-        unique_id = uuid.uuid4().hex
-        thumbnail_filename = None
-        if thumbnail:
-            thumbnail_filename = f"thumbnail_{unique_id}.jpg"
+            # Generate a unique filename for the thumbnail
+            unique_id = uuid.uuid4().hex
+            thumbnail_filename = None
+            if thumbnail:
+                thumbnail_filename = f"thumbnail_{unique_id}.jpg"
 
-            # Download the thumbnail image
-            response = requests.get(thumbnail)
-            if response.status_code == 200:
-                with open(thumbnail_filename, 'wb') as f:
-                    f.write(response.content)
+                # Download the thumbnail image
+                response = requests.get(thumbnail)
+                if response.status_code == 200:
+                    with open(thumbnail_filename, 'wb') as f:
+                        f.write(response.content)
 
-        await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
+            await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
 
-        if filename:
-            try:
-                await self.send_video(bot, update, filename, thumbnail_filename, msg)
-            except Exception as e:
-                print("⚠️ ERROR:- ", e)
+            if filename:
+                try:
+                    await self.send_video(bot, update, filename, thumbnail_filename, msg)
+                except Exception as e:
+                    print(f"⚠️ ERROR uploading video: {e}")
 
-        await msg.delete()
+            await msg.delete()
+            index += 1
 
-        index += 1
-        if index < len(self.queue_links[user_id]):
-            await self.download_multiple(bot, update, link_msg, index)
-        else:
-            try:
-                await update.message.reply_text(f"ALL LINKS DOWNLOADED SUCCESSFULLY ✅", reply_to_message_id=link_msg.id)
-            except:
-                await update.message.reply_text("ALL LINKS DOWNLOADED SUCCESSFULLY ✅")
+        try:
+            await update.message.reply_text(f"ALL LINKS DOWNLOADED SUCCESSFULLY ✅", reply_to_message_id=link_msg.id)
+        except:
+            await update.message.reply_text("ALL LINKS DOWNLOADED SUCCESSFULLY ✅")
 
     async def send_video(self, bot, update, file, thumbnail_filename, msg):
         user_id = update.from_user.id
-        if thumbnail_filename:
-            await bot.send_video(
-                chat_id=user_id,
-                video=file,
-                thumb=thumbnail_filename,
-                caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
-                progress=progress_for_pyrogram,
-                progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
-            )
-            os.remove(thumbnail_filename)
-        else:
-            await bot.send_video(
-                chat_id=user_id,
-                video=file,
-                caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
-                progress=progress_for_pyrogram,
-                progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
-            )
-        os.remove(file)
+        try:
+            if thumbnail_filename:
+                await bot.send_video(
+                    chat_id=user_id,
+                    video=file,
+                    thumb=thumbnail_filename,
+                    caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                    progress=progress_for_pyrogram,
+                    progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                )
+                os.remove(thumbnail_filename)
+            else:
+                await bot.send_video(
+                    chat_id=user_id,
+                    video=file,
+                    caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                    progress=progress_for_pyrogram,
+                    progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                )
+            os.remove(file)
+        except Exception as e:
+            print(f"⚠️ ERROR sending video: {e}")
+            await msg.edit(f"⚠️ ERROR sending video: {e}")
 
 downloader = Downloader()
 
