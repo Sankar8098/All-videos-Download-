@@ -2,11 +2,8 @@ import asyncio
 import os
 import sys
 import time
-import uuid
-import requests
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-import youtube_dl
 from config import Config
 from helper.utils import (
     download_progress_hook,
@@ -14,6 +11,7 @@ from helper.utils import (
     ytdl_downloads,
     get_porn_thumbnail_url,
     progress_for_pyrogram,
+    download_thumbnail,
 )
 
 class Downloader:
@@ -46,7 +44,7 @@ class Downloader:
                 await self._proceed_to_next(bot, update, link_msg, index + 1)
                 return
 
-        thumbnail_filename = await self._download_thumbnail(thumbnail)
+        thumbnail_filename = await download_thumbnail(thumbnail)
         await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
         await self._upload_video(bot, update, msg, thumbnail_filename)
 
@@ -59,19 +57,6 @@ class Downloader:
             await self.download_multiple(bot, update, link_msg, next_index)
         else:
             await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
-
-    async def _download_thumbnail(self, thumbnail_url):
-        if not thumbnail_url:
-            return None
-
-        unique_id = uuid.uuid4().hex
-        thumbnail_filename = f"thumbnail_{unique_id}.jpg"
-        response = requests.get(thumbnail_url)
-        if response.status_code == 200:
-            with open(thumbnail_filename, 'wb') as f:
-                f.write(response.content)
-            return thumbnail_filename
-        return None
 
     async def _upload_video(self, bot, update, msg, thumbnail_filename):
         user_id = update.from_user.id
