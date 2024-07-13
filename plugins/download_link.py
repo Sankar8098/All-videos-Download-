@@ -2,7 +2,6 @@ import asyncio
 import os
 import sys
 import time
-from pyrogram
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from config import Config
