@@ -11,6 +11,7 @@ youtube-dl==2021.6.6
 youtube-search-python
 youtube-search
 yt-dlp
+pipdeptree
 filesplit
 pytz
 moviepy
