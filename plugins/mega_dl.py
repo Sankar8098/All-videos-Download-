@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 import time
@@ -13,13 +12,11 @@ from posixpath import join
 from functools import partial
 from genericpath import isfile
 from hurry.filesize import size
-from asyncio import get_running_loop
 from pyrogram import Client, filters
-from helper.utils import progress_for_pyrogram, force_sub, is_subscribed
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from helper.utils import progress_for_pyrogram, force_sub, is_subscribed
 
 # Logging
-
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -37,13 +34,11 @@ TG_MAX_FILE_SIZE = Config.TG_MAX_SIZE
 MEGA_REGEX = "https?:\/\/mega\.nz\/(?:[^\/\s]+\/)+"
 
 # Download Mega Link
-
 def DownloadMegaLink(url, alreadylol, download_msg):
     try:
         m.download_url(url, alreadylol, statusdl_msg=download_msg)
     except Exception as e:
-        print(e)
-
+        logging.error(e)
 
 @Client.on_message(filters.regex(MEGA_REGEX) & filters.private)
 async def megadl(bot, message: Message):
@@ -54,7 +49,7 @@ async def megadl(bot, message: Message):
     url = message.text
     user_info = f'**User ID:** #id{message.from_user.id} \n**User Name:** [{message.from_user.first_name}](tg://user?id={message.from_user.id})'
     userpath = str(message.from_user.id)
-    alreadylol = basedir + "/" + userpath
+    alreadylol = os.path.join(basedir, userpath)
     try:
         if os.path.isdir(alreadylol):
             await message.reply_text(
@@ -65,7 +60,8 @@ async def megadl(bot, message: Message):
         else:
             os.makedirs(alreadylol)
     except Exception as e:
-        print(e)
+        logging.error(e)
+        return
 
     try:
         if 'folder' in url:
@@ -75,7 +71,6 @@ async def megadl(bot, message: Message):
             )
             return
         else:
-
             logs_msg = await message.forward(Config.LOG_CHANNEL)
             trace_msg = await logs_msg.reply_text(f"#MegaDL: Download Started! \n\n{user_info}")
             download_msg = await message.reply_text(
@@ -91,12 +86,10 @@ async def megadl(bot, message: Message):
                 ),
                 reply_to_message_id=message.id,
             )
-            loop = get_running_loop()
-            await loop.run_in_executor(None, partial(DownloadMegaLink, url, alreadylol, download_msg))
-            getfiles = [f for f in os.listdir(
-                alreadylol) if isfile(join(alreadylol, f))]
+            await asyncio.create_task(DownloadMegaLink(url, alreadylol, download_msg))
+            getfiles = [f for f in os.listdir(alreadylol) if isfile(join(alreadylol, f))]
             files = getfiles[0]
-            magapylol = f"{alreadylol}/{files}"
+            magapylol = os.path.join(alreadylol, files)
             await download_msg.edit("**Downloaded Successfully 😉!**")
             await trace_msg.edit(f"#MegaDL: Download Done! \n\n{user_info}")
     except Exception as e:
@@ -111,14 +104,15 @@ async def megadl(bot, message: Message):
             await trace_msg.edit(
                 f"#MegaDL: Download Failed! \nReason: `{e}` \n\n{user_info}"
             )
-        shutil.rmtree(basedir + '/' + userpath)
+        shutil.rmtree(alreadylol)
         return
+
     lmaocheckdis = os.stat(alreadylol).st_size
     readablefilesize = size(lmaocheckdis)  # Convert Bytes into readable size
     if lmaocheckdis > TG_MAX_FILE_SIZE:
         await download_msg.edit(f"**Detected File Size:** `{readablefilesize}` \n**Accepted File Size:** `2.0 GB` \n\nOops! File Is Too Large To Send In Telegram 🤒!")
         await trace_msg.edit(f"#MegaDL: Upload Failed! \nReason: `File is Larger Than 2GB.` \n\n{user_info}")
-        shutil.rmtree(basedir + "/" + userpath)
+        shutil.rmtree(alreadylol)
         return
     else:
         try:
@@ -129,28 +123,32 @@ async def megadl(bot, message: Message):
             safone = await message.reply_document(magapylol, progress=progress_for_pyrogram, progress_args=("**Uploading ...** \n", download_msg, start_time), reply_to_message_id=message.id)
             await safone.reply_text(
                 "**Cont. @Snowball_Official! \nThanks For Using Me 😘!**",
-
                 reply_to_message_id=message.id,
             )
             await download_msg.delete()
             await trace_msg.edit(f"#MegaDL: Upload Done! \n\n{user_info}")
-            shutil.rmtree(basedir + "/" + userpath)
+            shutil.rmtree(alreadylol)
             return
         except Exception as e:
-            print(e)
-        # Checking file type
-        filemimespotted = guessedfilemime.mime
-        await download_msg.edit("**Trying To Upload ...**")
+            logging.error(e)
+            await download_msg.edit(f"**Error:** `{e}`")
+            await trace_msg.edit(f"#MegaDL: Upload Failed! \nReason: `{e}` \n\n{user_info}")
+            shutil.rmtree(alreadylol)
+            return
+
+    # Checking file type and uploading accordingly
+    filemimespotted = guessedfilemime.mime
+    await download_msg.edit("**Trying To Upload ...**")
+    try:
         if "image/gif" in filemimespotted:
             safone = await message.reply_animation(magapylol, progress=progress_for_pyrogram, progress_args=("**Uploading ...** \n", download_msg, start_time), reply_to_message_id=message.id)
         elif "image" in filemimespotted:
             safone = await message.reply_photo(magapylol, progress=progress_for_pyrogram, progress_args=("**Uploading ...** \n", download_msg, start_time), reply_to_message_id=message.id)
         elif "video" in filemimespotted:
-            viddura = moviepy.editor.VideoFileClip(f"{magapylol}")
+            viddura = moviepy.editor.VideoFileClip(magapylol)
             vidduration = int(viddura.duration)
-            thumbnail_path = f"{alreadylol}/thumbnail.jpg"
-            subprocess.call(['ffmpeg', '-i', magapylol, '-ss',
-                            '00:00:10.000', '-vframes', '1', thumbnail_path])
+            thumbnail_path = os.path.join(alreadylol, "thumbnail.jpg")
+            subprocess.call(['ffmpeg', '-i', magapylol, '-ss', '00:00:10.000', '-vframes', '1', thumbnail_path])
             safone = await message.reply_video(magapylol, duration=vidduration, thumb=thumbnail_path, progress=progress_for_pyrogram, progress_args=("**Uploading ...** \n", download_msg, start_time), reply_to_message_id=message.id)
         elif "audio" in filemimespotted:
             safone = await message.reply_audio(magapylol, progress=progress_for_pyrogram, progress_args=("**Uploading ...** \n", download_msg, start_time), reply_to_message_id=message.id)
@@ -158,25 +156,27 @@ async def megadl(bot, message: Message):
             safone = await message.reply_document(magapylol, progress=progress_for_pyrogram, progress_args=("**Uploading ...** \n", download_msg, start_time), reply_to_message_id=message.id)
         await safone.reply_text(
             "**Cont. @SnowBall_Official! \nThanks For Using Me 😘!**",
-
             reply_to_message_id=safone.id,
         )
         await download_msg.delete()
         await trace_msg.edit(f"#MegaDL: Upload Done! \n\n{user_info}")
-    try:
-        shutil.rmtree(basedir + "/" + userpath)
-        print("[ MegaDL-Bot ] Successfully Cleaned Temp Download Directory!")
     except Exception as e:
-        print(e)
-        return
+        logging.error(e)
+        await download_msg.edit(f"**Error:** `{e}`")
+        await trace_msg.edit(f"#MegaDL: Upload Failed! \nReason: `{e}` \n\n{user_info}")
 
+    try:
+        shutil.rmtree(alreadylol)
+        logging.info("[ MegaDL-Bot ] Successfully Cleaned Temp Download Directory!")
+    except Exception as e:
+        logging.error(e)
 
 @Client.on_message(filters.command("cancel") & filters.private)
 async def cancel_dl(bot, message):
     userpath = str(message.from_user.id)
     try:
-        shutil.rmtree(basedir + "/" + userpath)
+        shutil.rmtree(os.path.join(basedir, userpath))
         await message.reply_text("✅ **Downloading Canceled Successfully!**", reply_to_message_id=message.id)
     except Exception as e:
-        await print(e)
+        logging.error(e)
         await message.reply_text("❌ **No Active Download Process To Cancel!**", reply_to_message_id=message.id)
