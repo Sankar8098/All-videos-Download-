@@ -26,7 +26,7 @@ async def search(client, query: InlineQuery):
 
     try:
         src = await api.search.search(query_text)  # Perform search
-    except ValueError as e:
+    except ValueError:
         # Handle case where no videos are found
         results.append(InlineQueryResultArticle(
             title="No Such Videos Found!",
