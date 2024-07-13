@@ -9,13 +9,13 @@ from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, 
 import youtube_dl
 from config import Config
 from helper.utils import (
-    download_progress_hook,
     get_thumbnail_url,
-    ytdl_downloads,
     get_porn_thumbnail_url,
+    ytdl_downloads,
     progress_for_pyrogram,
 )
 
+# Define Downloader class and functions
 class Downloader:
     def __init__(self):
         self.queue_links = {}
