@@ -9,4 +9,4 @@ RUN apt-get update && \
     pip install --upgrade pip && \
     pip install -r requirements.txt
 
-CMD gunicorn app:app & python3 TeraboxBot.py
+CMD gunicorn app:app & python3 bot.py
