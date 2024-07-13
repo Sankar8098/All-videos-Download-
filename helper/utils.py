@@ -15,7 +15,6 @@ from helper.utils import (
     progress_for_pyrogram,
 )
 
-# Define Downloader class and functions
 class Downloader:
     def __init__(self):
         self.queue_links = {}
@@ -28,7 +27,6 @@ class Downloader:
             disable_web_page_preview=True
         )
 
-        # Set options for youtube-dl
         if current_link.startswith("https://www.pornhub"):
             thumbnail = get_porn_thumbnail_url(current_link)
         else:
@@ -141,3 +139,4 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
             await downloader.download_multiple(bot, update, links_msg)
         except Exception as e:
             print(f'Error on line {sys.exc_info()[-1].tb_lineno}: {type(e).__name__} - {e}')
+
