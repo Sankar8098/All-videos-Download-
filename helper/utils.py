@@ -1,208 +1,143 @@
-import math
-import os
-import time
 import asyncio
-import logging
-import requests
+import os
+import sys
+import time
 import uuid
-from datetime import datetime
-from pytz import timezone
-from pyrogram.errors.exceptions import MessageNotModified, FloodWait, UserNotParticipant
-from pyrogram import enums
-from youtube_dl import DownloadError
+import requests
+from pyrogram import Client, filters
+from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 import youtube_dl
-from config import Config, Txt
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from config import Config
+from helper.utils import (
+    download_progress_hook,
+    get_thumbnail_url,
+    ytdl_downloads,
+    get_porn_thumbnail_url,
+    progress_for_pyrogram,
+)
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+class Downloader:
+    def __init__(self):
+        self.queue_links = {}
 
-
-async def progress_for_pyrogram(current, total, ud_type, message, start):
-    now = time.time()
-    diff = now - start
-    if round(diff % 5.00) == 0 or current == total:
-        percentage = current * 100 / total
-        speed = current / diff
-        elapsed_time = round(diff) * 1000
-        time_to_completion = round((total - current) / speed) * 1000
-        estimated_total_time = elapsed_time + time_to_completion
-
-        elapsed_time = TimeFormatter(milliseconds=elapsed_time)
-        estimated_total_time = TimeFormatter(milliseconds=estimated_total_time)
-
-        progress = "{0}{1}".format(
-            ''.join(["⬢" for i in range(math.floor(percentage / 5))]),
-            ''.join(["⬡" for i in range(20 - math.floor(percentage / 5))])
+    async def download_multiple(self, bot, update, link_msg, index=0):
+        user_id = update.from_user.id
+        current_link = self.queue_links[user_id][index]
+        msg = await update.message.reply_text(
+            f"**{index + 1}. Link:-** {current_link}\n\nDownloading... Please Have Patience\n 𝙇𝙤𝙖𝙙𝙞𝙣𝙜...\n\n⚠️ **Please note that for multiple downloads, the progress may not be immediately apparent. Therefore, if it appears that nothing is downloading, please wait a few minutes as the downloads may be processing in the background. The duration of the download process can also vary depending on the content being downloaded, so we kindly ask for your patience.**",
+            disable_web_page_preview=True
         )
-        tmp = progress + Txt.PROGRESS_BAR.format(
-            round(percentage, 2),
-            humanbytes(current),
-            humanbytes(total),
-            humanbytes(speed),
-            estimated_total_time if estimated_total_time != '' else "0 s"
-        )
-        try:
-            await message.edit(
-                text=f"{ud_type}\n\n{tmp}"
-            )
-        except:
-            pass
 
+        # Set options for youtube-dl
+        if current_link.startswith("https://www.pornhub"):
+            thumbnail = get_porn_thumbnail_url(current_link)
+        else:
+            thumbnail = get_thumbnail_url(current_link)
 
-def TimeFormatter(milliseconds: int) -> str:
-    seconds, milliseconds = divmod(int(milliseconds), 1000)
-    minutes, seconds = divmod(seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    days, hours = divmod(hours, 24)
-    tmp = ((str(days) + "ᴅ, ") if days else "") + \
-        ((str(hours) + "ʜ, ") if hours else "") + \
-        ((str(minutes) + "ᴍ, ") if minutes else "") + \
-        ((str(seconds) + "ꜱ, ") if seconds else "") + \
-        ((str(milliseconds) + "ᴍꜱ, ") if milliseconds else "")
-    return tmp[:-2]
+        ytdl_opts = {
+            'format': 'best',
+            'progress_hooks': [lambda d: download_progress_hook(d, msg, current_link)]
+        }
 
+        with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
+            try:
+                ydl.download([current_link])
+            except youtube_dl.utils.DownloadError as e:
+                await msg.edit(f"Sorry, There was a problem with that particular video: {e}")
+                await self._proceed_to_next(bot, update, link_msg, index + 1)
+                return
 
-def convert(seconds):
-    seconds = seconds % (24 * 3600)
-    hour = seconds // 3600
-    seconds %= 3600
-    minutes = seconds // 60
-    seconds %= 60
-    return "%d:%02d:%02d" % (hour, minutes, seconds)
+        thumbnail_filename = await self._download_thumbnail(thumbnail)
+        await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
+        await self._upload_video(bot, update, msg, thumbnail_filename)
 
+        await msg.delete()
+        await self._proceed_to_next(bot, update, link_msg, index + 1)
 
-def humanbytes(size):
-    if not size:
-        return ""
-    power = 2 ** 10
-    raised_to_pow = 0
-    dict_power_n = {0: "", 1: "Ki", 2: "Mi", 3: "Gi", 4: "Ti"}
-    while size > power:
-        size /= power
-        raised_to_pow += 1
-    return str(round(size, 2)) + " " + dict_power_n[raised_to_pow] + "B"
+    async def _proceed_to_next(self, bot, update, link_msg, next_index):
+        user_id = update.from_user.id
+        if next_index < len(self.queue_links[user_id]):
+            await self.download_multiple(bot, update, link_msg, next_index)
+        else:
+            await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
 
-
-def download_progress_hook(d, progress_message, link):
-    if d['status'] == 'downloading':
-        percentage = d['_percent_str']
-        speed = d['_speed_str']
-        eta = d['_eta_str']
-        message = f"**Link :- ** {link}\n\n Downloading: {percentage} | Speed: {speed} | ETA: {eta}"
-        try:
-            progress_message.edit_text(message, disable_web_page_preview=True)
-        except:
-            pass
-
-
-def get_thumbnail_url(video_url):
-    ydl_opts = {
-        'format': 'best',
-        'quiet': True,
-    }
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(video_url, download=False)
-        try:
-            thumbnail_url = info_dict['thumbnails'][0]['url']
-            return thumbnail_url
-        except Exception as e:
-            print(e)
+    async def _download_thumbnail(self, thumbnail_url):
+        if not thumbnail_url:
             return None
 
-
-def get_porn_thumbnail_url(video_url):
-    ydl_opts = {
-        'format': 'best',
-        'quiet': True,
-    }
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(video_url, download=False)
-        try:
-            thumbnail_url = info_dict['thumbnail']
-            return thumbnail_url
-        except Exception as e:
-            print(e)
-            return None
-
-
-async def run_async(func, *args, **kwargs):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, func, *args, **kwargs)
-
-
-async def is_subscribed(bot, query):
-    try:
-        user = await bot.get_chat_member(Config.AUTH_CHANNEL, query.from_user.id)
-    except UserNotParticipant:
-        pass
-    except Exception as e:
-        logger.exception(e)
-    else:
-        if user.status != enums.ChatMemberStatus.BANNED:
-            return True
-    return False
-
-
-async def force_sub(bot, cmd):
-    invite_link = await bot.create_chat_invite_link(int(Config.AUTH_CHANNEL))
-    buttons = [[InlineKeyboardButton(
-        text="📢 Cont. Owner to add you in Channel 📢", url="https://t.me/Snowball_Official")]]
-    text = "**Sᴏʀʀy Dᴜᴅᴇ Yᴏᴜ'ʀᴇ Nᴏᴛ Jᴏɪɴᴇᴅ My Cʜᴀɴɴᴇʟ 😐. Sᴏ Pʟᴇᴀꜱᴇ Jᴏɪɴ Oᴜʀ Uᴩᴅᴀᴛᴇ Cʜᴀɴɴᴇʟ Tᴏ Cᴄᴏɴᴛɪɴᴜᴇ**"
-    return await cmd.reply_text(text=text, reply_markup=InlineKeyboardMarkup(buttons))
-
-
-async def ytdl_downloads(bot, update, http_link):
-    msg = await update.message.edit(f"**Link:-** {http_link}\n\nDownloading... Please Have Patience\n 𝙇𝙤𝙖𝙙𝙞𝙣𝙜...", disable_web_page_preview=True)
-
-    # Set options for youtube-dl
-    if str(http_link).startswith("https://www.pornhub"):
-        thumbnail = get_porn_thumbnail_url(http_link)
-    else:
-        thumbnail = get_thumbnail_url(http_link)
-
-    ytdl_opts = {
-        'format': 'best',
-        'progress_hooks': [lambda d: download_progress_hook(d, msg, http_link)],
-    }
-    loop = asyncio.get_event_loop()
-    with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
-        try:
-            await loop.run_in_executor(None, ydl.download, [http_link])
-        except DownloadError:
-            await msg.edit("Sorry, There was a problem with that particular video")
-            return
-
-    await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
-    unique_id = uuid.uuid4().hex
-
-    if thumbnail:
+        unique_id = uuid.uuid4().hex
         thumbnail_filename = f"thumbnail_{unique_id}.jpg"
-        response = requests.get(thumbnail)
+        response = requests.get(thumbnail_url)
         if response.status_code == 200:
             with open(thumbnail_filename, 'wb') as f:
                 f.write(response.content)
+            return thumbnail_filename
+        return None
 
-    for file in os.listdir('.'):
-        if file.endswith(".mp4") or file.endswith('.mkv'):
-            try:
-                video_file = file
-                info_dict = ydl.extract_info(http_link, download=False)
-                video_duration = info_dict.get('duration', 0)
+    async def _upload_video(self, bot, update, msg, thumbnail_filename):
+        user_id = update.from_user.id
+        for file in os.listdir('.'):
+            if file.endswith(".mp4") or file.endswith('.mkv'):
+                try:
+                    await bot.send_video(
+                        chat_id=user_id,
+                        video=file,
+                        thumb=thumbnail_filename if thumbnail_filename else None,
+                        caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                        progress=progress_for_pyrogram,
+                        progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                    )
+                    os.remove(file)
+                    if thumbnail_filename:
+                        os.remove(thumbnail_filename)
+                    break
+                except Exception as e:
+                    print("⚠️  ERROR:- ", e)
+                    break
 
-                if thumbnail:
-                    await bot.send_video(chat_id=update.from_user.id, video=f"{video_file}", thumb=thumbnail_filename, caption=f"**📁 File Name:- `{video_file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}", duration=video_duration, progress=progress_for_pyrogram, progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time()))
-                    os.remove(f"{video_file}")
-                    os.remove(thumbnail_filename)
-                    break
-                else:
-                    await bot.send_video(chat_id=update.from_user.id, video=f"{video_file}", caption=f"**📁 File Name:- `{video_file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}", duration=video_duration, progress=progress_for_pyrogram, progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time()))
-                    os.remove(f"{video_file}")
-                    break
-            except Exception as e:
-                await msg.edit(str(e))
+downloader = Downloader()
+
+@Client.on_message(filters.regex(pattern=r"(?=.*https://)(?!.*\bmega\b).*") & filters.user(Config.ADMIN))
+async def handle_yt_dl(bot: Client, cmd: Message):
+    await cmd.reply_text(
+        "**Do you want to download this file ?**", 
+        reply_to_message_id=cmd.id, 
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton('🔻 Download 🔻', callback_data='http_link')],
+            [InlineKeyboardButton('🖇️ Add Multiple Links 🖇️', callback_data='multiple_http_link')]
+        ])
+    )
+
+@Client.on_callback_query(filters.regex('^http_link'))
+async def handle_single_download(bot: Client, update: CallbackQuery):
+    http_link = update.message.reply_to_message.text
+    await ytdl_downloads(bot, update, http_link)
+
+@Client.on_callback_query(filters.regex('^multiple_http_link'))
+async def handle_multiple_download(bot: Client, update: CallbackQuery):
+    http_link = update.message.reply_to_message.text
+    user_id = update.from_user.id
+
+    if user_id not in downloader.queue_links:
+        downloader.queue_links[user_id] = [http_link]
+        await update.message.delete()
+        links_msg = None
+        while True:
+            link = await bot.ask(chat_id=user_id, text="🔗Send Link to add it to queue 🔗\n\nUse /done when you're done adding links to queue.", filters=filters.text, reply_to_message_id=update.message.id)
+            if str(link.text).startswith("https"):
+                downloader.queue_links[user_id].append(link.text)
+                await update.message.reply_text("Successfully Added To Queue ✅", reply_to_message_id=link.id)
+            elif link.text == "/done":
+                user_links = downloader.queue_links[user_id]
+                links_text = "\n".join([f"{idx+1}. `{link}`" for idx, link in enumerate(user_links)])
+                links_msg = await update.message.reply_text(f"👤 <code>{update.from_user.first_name}</code> 🍁\n\n {links_text}")
                 break
-        else:
-            continue
+            else:
+                await update.message.reply_text("⚠️ Please Send Valid Link !")
+                continue
 
-    await msg.delete()
+        await update.message.reply_text("Downloading Started ✅\n\nPlease have patience while it's downloading it may take sometimes...")
+        try:
+            await downloader.download_multiple(bot, update, links_msg)
+        except Exception as e:
+            print(f'Error on line {sys.exc_info()[-1].tb_lineno}: {type(e).__name__} - {e}')
