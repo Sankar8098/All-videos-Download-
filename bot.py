@@ -60,6 +60,12 @@ class Bot(Client):
         await super().stop()
         logging.info("Bot Stopped 🙄")
 
-if __name__ == "__main__":
+async def main():
     bot = Bot()
-    bot.run()
+    await bot.start()
+
+if __name__ == "__main__":
+    import asyncio
+    # Check if the event loop is already running
+    if not asyncio.get_event_loop().is_running():
+        asyncio.run(main())
