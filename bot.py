@@ -4,6 +4,7 @@ import time
 import uuid
 import requests
 from pyrogram import Client, filters
+from pyrogram.errors import FloodWait
 from pyrogram.types import Message
 import youtube_dl
 from config import Config
@@ -108,7 +109,12 @@ async def start_bot():
         bot_token=Config.BOT_TOKEN
     )
 
-    await bot.start()
+    try:
+        await bot.start()
+    except FloodWait as e:
+        print(f"Flood wait error: waiting for {e.x} seconds.")
+        await asyncio.sleep(e.x)
+        await bot.start()
 
     @bot.on_message(filters.command(["start"]))
     async def start(_, message: Message):
@@ -123,7 +129,8 @@ async def start_bot():
         else:
             await message.reply_text("Please send a valid link.")
 
-    await bot.idle()
+    while True:
+        await asyncio.sleep(60)
 
 if __name__ == "__main__":
     asyncio.run(start_bot())
