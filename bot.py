@@ -1,17 +1,15 @@
 import asyncio
 import os
-import sys
 import time
 import uuid
 import requests
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from pyrogram.types import Message
 import youtube_dl
 from config import Config
 from helper.utils import (
     download_progress_hook,
     get_thumbnail_url,
-    ytdl_downloads,
     get_porn_thumbnail_url,
     progress_for_pyrogram,
 )
@@ -25,8 +23,11 @@ class Downloader:
 
     async def download_multiple(self, bot, update, link_msg, index=0):
         user_id = update.from_user.id
+        if user_id not in self.queue_links:
+            self.queue_links[user_id] = [link_msg.text.strip()]
+
         current_link = self.queue_links[user_id][index]
-        msg = await update.message.reply_text(
+        msg = await update.reply_text(
             f"**{index + 1}. Link:-** {current_link}\n\nDownloading... Please Have Patience\n 𝙇𝙤𝙖𝙙𝙞𝙣𝙜...\n\n⚠️ **Please note that for multiple downloads, the progress may not be immediately apparent. Therefore, if it appears that nothing is downloading, please wait a few minutes as the downloads may be processing in the background. The duration of the download process can also vary depending on the content being downloaded, so we kindly ask for your patience.**",
             disable_web_page_preview=True
         )
@@ -62,7 +63,7 @@ class Downloader:
         if next_index < len(self.queue_links[user_id]):
             await self.download_multiple(bot, update, link_msg, next_index)
         else:
-            await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
+            await update.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
 
     async def _download_thumbnail(self, thumbnail_url):
         if not thumbnail_url:
@@ -100,7 +101,12 @@ class Downloader:
                 continue
 
 async def start_bot():
-    bot = Client("my_account")
+    bot = Client(
+        "my_account",
+        api_id=Config.API_ID,
+        api_hash=Config.API_HASH,
+        bot_token=Config.BOT_TOKEN
+    )
 
     await bot.start()
 
