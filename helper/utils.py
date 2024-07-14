@@ -5,6 +5,7 @@ import asyncio
 import logging
 import requests
 import uuid
+from .thumbnail import get_thumbnail_url, get_porn_thumbnail_url, download_thumbnail
 from datetime import datetime
 from pytz import timezone
 from pyrogram.errors.exceptions import MessageNotModified, FloodWait, UserNotParticipant
