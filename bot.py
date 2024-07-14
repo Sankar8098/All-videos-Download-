@@ -1,71 +1,123 @@
-import logging
-import logging.config
-from pyrogram import Client, __version__
-from pyrogram.raw.all import layer
+import asyncio
+import os
+import sys
+import time
+import uuid
+import requests
+from pyrogram import Client, filters
+from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+import youtube_dl
 from config import Config
-from aiohttp import web
-from pytz import timezone
-from datetime import datetime
-from plugins.web_support import web_server
-import pyromod
+from helper.utils import (
+    download_progress_hook,
+    get_thumbnail_url,
+    ytdl_downloads,
+    get_porn_thumbnail_url,
+    progress_for_pyrogram,
+)
+import nest_asyncio
 
-# Load logging configuration
-logging.config.fileConfig('logging.conf')
-logging.getLogger().setLevel(logging.INFO)
-logging.getLogger("pyrogram").setLevel(logging.ERROR)
+nest_asyncio.apply()
 
-class Bot(Client):
-
+class Downloader:
     def __init__(self):
-        super().__init__(
-            name="Snowball",
-            api_id=Config.API_ID,
-            api_hash=Config.API_HASH,
-            bot_token=Config.BOT_TOKEN,
-            workers=200,
-            plugins={"root": "plugins"},
-            sleep_threshold=15,
+        self.queue_links = {}
+
+    async def download_multiple(self, bot, update, link_msg, index=0):
+        user_id = update.from_user.id
+        current_link = self.queue_links[user_id][index]
+        msg = await update.message.reply_text(
+            f"**{index + 1}. Link:-** {current_link}\n\nDownloading... Please Have Patience\n 𝙇𝙤𝙖𝙙𝙞𝙣𝙜...\n\n⚠️ **Please note that for multiple downloads, the progress may not be immediately apparent. Therefore, if it appears that nothing is downloading, please wait a few minutes as the downloads may be processing in the background. The duration of the download process can also vary depending on the content being downloaded, so we kindly ask for your patience.**",
+            disable_web_page_preview=True
         )
 
-    async def start(self):
-        await super().start()
-        me = await self.get_me()
-        self.mention = me.mention
-        self.username = me.username
+        # Set options for youtube-dl
+        if current_link.startswith("https://www.pornhub"):
+            thumbnail = get_porn_thumbnail_url(current_link)
+        else:
+            thumbnail = get_thumbnail_url(current_link)
 
-        if Config.WEBHOOK:
-            app = web.AppRunner(await web_server())
-            await app.setup()
-            bind_address = "0.0.0.0"
-            await web.TCPSite(app, bind_address, Config.PORT).start()
+        ytdl_opts = {
+            'format': 'best',
+            'progress_hooks': [lambda d: download_progress_hook(d, msg, current_link)]
+        }
 
-        logging.info(f"{me.first_name} ✅✅ BOT started successfully ✅✅")
-
-        for id in Config.ADMIN:
+        with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
             try:
-                await self.send_message(id, f"**__{me.first_name}  Iꜱ Sᴛᴀʀᴛᴇᴅ.....✨️__**")
-            except Exception as e:
-                logging.error(f"Failed to send start message to admin {id}: {e}")
+                await asyncio.get_event_loop().run_in_executor(None, ydl.download, [current_link])
+            except youtube_dl.utils.DownloadError as e:
+                await msg.edit(f"Sorry, There was a problem with that particular video: {e}")
+                await self._proceed_to_next(bot, update, link_msg, index + 1)
+                return
 
-        if Config.LOG_CHANNEL:
-            try:
-                curr = datetime.now(timezone("Asia/Kolkata"))
-                date = curr.strftime('%d %B, %Y')
-                time = curr.strftime('%I:%M:%S %p')
-                await self.send_message(Config.LOG_CHANNEL, f"**__{me.mention} Iꜱ Rᴇsᴛᴀʀᴛᴇᴅ !!**\n\n📅 Dᴀᴛᴇ : `{date}`\n⏰ Tɪᴍᴇ : `{time}`\n🌐 Tɪᴍᴇᴢᴏɴᴇ : `Asia/Kolkata`\n\n🉐 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`</b>")
-            except Exception as e:
-                logging.error(f"Failed to send log channel message: {e}")
+        thumbnail_filename = await self._download_thumbnail(thumbnail)
+        await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
+        await self._upload_video(bot, update, msg, thumbnail_filename)
 
-    async def stop(self, *args):
-        await super().stop()
-        logging.info("Bot Stopped 🙄")
+        await msg.delete()
+        await self._proceed_to_next(bot, update, link_msg, index + 1)
 
-async def main():
-    bot = Bot()
+    async def _proceed_to_next(self, bot, update, link_msg, next_index):
+        user_id = update.from_user.id
+        if next_index < len(self.queue_links[user_id]):
+            await self.download_multiple(bot, update, link_msg, next_index)
+        else:
+            await update.message.reply_text(f"𝒜𝐿𝐿 𝐿𝐼𝒩𝒦𝒮 𝒟𝒪𝒲𝒩𝐿𝒪𝒜𝒟𝐸𝒟 𝒮𝒰𝒞𝒞𝐸𝒮𝒮𝐹𝒰𝐿𝐿𝒴 ✅", reply_to_message_id=link_msg.id)
+
+    async def _download_thumbnail(self, thumbnail_url):
+        if not thumbnail_url:
+            return None
+
+        unique_id = uuid.uuid4().hex
+        thumbnail_filename = f"thumbnail_{unique_id}.jpg"
+        response = requests.get(thumbnail_url)
+        if response.status_code == 200:
+            with open(thumbnail_filename, 'wb') as f:
+                f.write(response.content)
+            return thumbnail_filename
+        return None
+
+    async def _upload_video(self, bot, update, msg, thumbnail_filename):
+        user_id = update.from_user.id
+        for file in os.listdir('.'):
+            if file.endswith(".mp4") or file.endswith('.mkv'):
+                try:
+                    await bot.send_video(
+                        chat_id=user_id,
+                        video=file,
+                        thumb=thumbnail_filename if thumbnail_filename else None,
+                        caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                        progress=progress_for_pyrogram,
+                        progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time()))
+                    os.remove(file)
+                    if thumbnail_filename:
+                        os.remove(thumbnail_filename)
+                    break
+                except Exception as e:
+                    await msg.edit(str(e))
+                    break
+            else:
+                continue
+
+async def start_bot():
+    bot = Client("my_account")
+
     await bot.start()
 
+    @bot.on_message(filters.command(["start"]))
+    async def start(_, message: Message):
+        await message.reply_text("Hello! Send me a link to download.")
+
+    @bot.on_message(filters.text & filters.private)
+    async def download_video(_, message: Message):
+        link = message.text.strip()
+        if "http" in link:
+            downloader = Downloader()
+            await downloader.download_multiple(bot, message, message)
+        else:
+            await message.reply_text("Please send a valid link.")
+
+    await bot.idle()
+
 if __name__ == "__main__":
-    import asyncio
-    # Check if the event loop is already running
-    if not asyncio.get_event_loop().is_running():
-        asyncio.run(main())
+    asyncio.run(start_bot())
