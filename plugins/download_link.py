@@ -2,6 +2,8 @@ import asyncio
 import os
 import sys
 import time
+import math
+import youtube_dl
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from config import Config
@@ -69,7 +71,7 @@ class Downloader:
                         thumb=thumbnail_filename if thumbnail_filename else None,
                         caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
                         progress=progress_for_pyrogram,
-                        progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                        progress_args=(msg, time.time())
                     )
                     os.remove(file)
                     if thumbnail_filename:
@@ -80,6 +82,55 @@ class Downloader:
                     break
 
 downloader = Downloader()
+
+def progress_for_pyrogram(current, total, msg, start_time):
+    elapsed_time = time.time() - start_time
+    if elapsed_time < 1:
+        elapsed_time = 1
+    speed = current / elapsed_time
+    time_to_completion = (total - current) / speed
+    percentage = current * 100 / total
+
+    progress_str = "[{0}{1}] {2}%\n".format(
+        ''.join(["▰" for i in range(math.floor(percentage / 5))]),
+        ''.join(["▱" for i in range(20 - math.floor(percentage / 5))]),
+        round(percentage, 2)
+    )
+
+    time_text = "• Elapsed: {}s\n• ETA: {}s".format(
+        round(elapsed_time, 2),
+        round(time_to_completion, 2)
+    )
+
+    try:
+        msg.edit(f"⚠️ Please Wait...\n\n**Uploading Started...**\n\n{progress_str}\n{time_text}")
+    except Exception as e:
+        print(e)
+
+def download_progress_hook(d, msg, link):
+    if d['status'] == 'downloading':
+        total = d.get('total_bytes') or d.get('total_bytes_estimate')
+        current = d.get('downloaded_bytes')
+        start_time = d.get('start_time')
+        progress_for_pyrogram(current, total, msg, start_time)
+
+async def ytdl_downloads(bot, update, link):
+    msg = await update.message.reply_text("Downloading... Please have patience", disable_web_page_preview=True)
+
+    ytdl_opts = {
+        'format': 'best',
+        'progress_hooks': [lambda d: download_progress_hook(d, msg, link)]
+    }
+
+    with youtube_dl.YoutubeDL(ytdl_opts) as ydl:
+        try:
+            ydl.download([link])
+        except youtube_dl.utils.DownloadError as e:
+            await msg.edit(f"Sorry, there was a problem with that particular video: {e}")
+            return
+
+    await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
+    await downloader._upload_video(bot, update, msg, None)
 
 @Client.on_message(filters.regex(pattern=r"(?=.*https://)(?!.*\bmega\b).*") & filters.user(Config.ADMIN))
 async def handle_yt_dl(bot: Client, cmd: Message):
