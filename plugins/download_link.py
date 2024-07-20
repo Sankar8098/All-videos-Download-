@@ -10,9 +10,7 @@ from config import Config
 from helper.utils import (
     download_progress_hook,
     get_thumbnail_url,
-    ytdl_downloads,
     get_porn_thumbnail_url,
-    progress_for_pyrogram,
     download_thumbnail,
 )
 
@@ -91,16 +89,18 @@ def progress_for_pyrogram(current, total, msg, start_time):
     time_to_completion = (total - current) / speed
     percentage = current * 100 / total
 
+    def human_readable_time(seconds):
+        mins, secs = divmod(seconds, 60)
+        hours, mins = divmod(mins, 60)
+        return f"{int(hours):02}:{int(mins):02}:{int(secs):02}"
+
     progress_str = "[{0}{1}] {2}%\n".format(
         ''.join(["▰" for i in range(math.floor(percentage / 5))]),
         ''.join(["▱" for i in range(20 - math.floor(percentage / 5))]),
         round(percentage, 2)
     )
 
-    time_text = "• Elapsed: {}s\n• ETA: {}s".format(
-        round(elapsed_time, 2),
-        round(time_to_completion, 2)
-    )
+    time_text = f"• Elapsed: {human_readable_time(elapsed_time)}\n• ETA: {human_readable_time(time_to_completion)}"
 
     try:
         msg.edit(f"⚠️ Please Wait...\n\n**Uploading Started...**\n\n{progress_str}\n{time_text}")
@@ -130,6 +130,8 @@ async def ytdl_downloads(bot, update, link):
             return
 
     await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
+
+    # Upload the video
     await downloader._upload_video(bot, update, msg, None)
 
 @Client.on_message(filters.regex(pattern=r"(?=.*https://)(?!.*\bmega\b).*") & filters.user(Config.ADMIN))
@@ -176,3 +178,4 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
             await downloader.download_multiple(bot, update, links_msg)
         except Exception as e:
             print(f'Error on line {sys.exc_info()[-1].tb_lineno}: {type(e).__name__} - {e}')
+
