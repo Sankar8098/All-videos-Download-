@@ -1,3 +1,4 @@
+import asyncio
 from pornhub_api import PornhubApi
 from pornhub_api.backends.aiohttp import AioHttpBackend
 from pyrogram import Client, filters
@@ -9,6 +10,26 @@ app = Client("my_bot")
 # Define inline keyboard buttons
 btn1 = InlineKeyboardButton("Search Here", switch_inline_query_current_chat="")
 btn2 = InlineKeyboardButton("Go Inline", switch_inline_query="")
+
+# Helper function to format duration
+def format_duration(duration):
+    try:
+        parts = duration.split(':')
+        if len(parts) == 2:  # MM:SS
+            minutes = int(parts[0])
+            seconds = int(parts[1])
+            hours = 0
+        elif len(parts) == 3:  # HH:MM:SS
+            hours = int(parts[0])
+            minutes = int(parts[1])
+            seconds = int(parts[2])
+        else:
+            return duration  # Return original if format is unexpected
+
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
+    except Exception as e:
+        print(f"Error formatting duration: {e}")
+        return duration
 
 # Handle inline queries
 @app.on_inline_query()
@@ -52,8 +73,11 @@ async def search(client, query: InlineQuery):
             categories = "N/A"
             tags = "N/A"
 
+        # Format the duration
+        formatted_duration = format_duration(vid.duration)
+
         msg = (f"**TITLE**: `{vid.title}`\n"
-               f"**DURATION**: `{vid.duration}`\n"
+               f"**DURATION**: `{formatted_duration}`\n"
                f"**VIEWS**: `{vid.views}`\n\n"
                f"**Pornstars**: {pornstars}\n"
                f"**Categories**: {categories}\n\n"
@@ -66,7 +90,7 @@ async def search(client, query: InlineQuery):
                 message_text=msg,
                 disable_web_page_preview=True
             ),
-            description=f"Duration: {vid.duration}\nViews: {vid.views}\nRating: {vid.rating}",
+            description=f"Duration: {formatted_duration}\nViews: {vid.views}\nRating: {vid.rating}",
             thumb_url=vid.thumb,  # Assuming vid.thumb is a valid URL
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Watch Online", url=vid.url), btn1]
