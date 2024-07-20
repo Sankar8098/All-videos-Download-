@@ -4,6 +4,9 @@ import sys
 import time
 import math
 import youtube_dl
+import logging
+from datetime import datetime
+from moviepy.editor import VideoFileClip
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from config import Config
@@ -63,17 +66,7 @@ class Downloader:
         for file in os.listdir('.'):
             if file.endswith(".mp4") or file.endswith('.mkv'):
                 try:
-                    await bot.send_video(
-                        chat_id=user_id,
-                        video=file,
-                        thumb=thumbnail_filename if thumbnail_filename else None,
-                        caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
-                        progress=progress_for_pyrogram,
-                        progress_args=(msg, time.time())
-                    )
-                    os.remove(file)
-                    if thumbnail_filename:
-                        os.remove(thumbnail_filename)
+                    await upload_video(bot, file, thumbnail_filename, file, msg, Config.COLLECTION_CHANNEL_ID, f"@{update.from_user.username}", user_id, update.message)
                     break
                 except Exception as e:
                     print("⚠️  ERROR:- ", e)
@@ -145,6 +138,41 @@ async def ytdl_downloads(bot, update, link):
     if filename:
         os.remove(filename)
 
+async def upload_video(client, file_path, thumbnail_path, video_title, reply_msg, collection_channel_id, user_mention, user_id, message):
+    file_size = os.path.getsize(file_path)
+    uploaded = 0
+    start_time = datetime.now()
+    last_update_time = time.time()
+
+    try:
+        duration = 0
+        path = str(file_path)
+        clip = VideoFileClip(path)
+        duration = int(clip.duration)
+        clip.close()
+    except Exception as e:
+        logging.warning(f"can't add duration: {e}")
+        duration = 0
+
+    hours, remainder = divmod(duration, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    conv_duration = f"{hours:02}:{minutes:02}:{seconds:02}"
+
+    try:
+        await client.send_video(
+            chat_id=user_id,
+            video=file_path,
+            thumb=thumbnail_path if thumbnail_path else None,
+            caption=f"**📁 File Name:- `{video_title}`\n\nDuration: {conv_duration}\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+            progress=progress_for_pyrogram,
+            progress_args=(reply_msg, start_time.timestamp())
+        )
+        os.remove(file_path)
+        if thumbnail_path:
+            os.remove(thumbnail_path)
+    except Exception as e:
+        logging.error(f"Error uploading video: {e}")
+
 @Client.on_message(filters.regex(pattern=r"(?=.*https://)(?!.*\bmega\b).*") & filters.user(Config.ADMIN))
 async def handle_yt_dl(bot: Client, cmd: Message):
     await cmd.reply_text(
@@ -189,3 +217,5 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
             await downloader.download_multiple(bot, update, links_msg)
         except Exception as e:
             print(f'Error on line {sys.exc_info()[-1].tb_lineno}: {type(e).__name__} - {e}')
+
+# Start the Clien
