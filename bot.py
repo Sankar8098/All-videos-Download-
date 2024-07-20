@@ -3,10 +3,12 @@ import os
 import time
 import uuid
 import requests
+import logging
 from pyrogram import Client, filters
 from pyrogram.errors import FloodWait
 from pyrogram.types import Message
 import youtube_dl
+from moviepy.editor import VideoFileClip
 from config import Config
 from helper.utils import (
     download_progress_hook,
@@ -84,13 +86,24 @@ class Downloader:
         for file in os.listdir('.'):
             if file.endswith(".mp4") or file.endswith('.mkv'):
                 try:
+                    # Extract duration using moviepy
+                    clip = VideoFileClip(file)
+                    duration = int(clip.duration)
+                    clip.close()
+
+                    # Format duration to HH:MM:SS
+                    hours, remainder = divmod(duration, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    formatted_duration = f"{hours:02}:{minutes:02}:{seconds:02}"
+
                     await bot.send_video(
                         chat_id=user_id,
                         video=file,
                         thumb=thumbnail_filename if thumbnail_filename else None,
-                        caption=f"**📁 File Name:- `{file}`\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
+                        caption=f"**📁 File Name:- `{file}`\n\nDuration: {formatted_duration}\n\nHere Is your Requested Video 🔥**\n\nPowered By - @{Config.BOT_USERNAME}",
                         progress=progress_for_pyrogram,
-                        progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time()))
+                        progress_args=("\n⚠️ Please Wait...\n\n**Uploading Started...**", msg, time.time())
+                    )
                     os.remove(file)
                     if thumbnail_filename:
                         os.remove(thumbnail_filename)
