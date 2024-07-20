@@ -131,8 +131,19 @@ async def ytdl_downloads(bot, update, link):
 
     await msg.edit("⚠️ Please Wait...\n\n**Trying to Upload....**")
 
+    # Ensure metadata is retained
+    filename = None
+    for file in os.listdir('.'):
+        if file.endswith(".mp4") or file.endswith('.mkv'):
+            filename = file
+            break
+
     # Upload the video
     await downloader._upload_video(bot, update, msg, None)
+
+    # Clean up file
+    if filename:
+        os.remove(filename)
 
 @Client.on_message(filters.regex(pattern=r"(?=.*https://)(?!.*\bmega\b).*") & filters.user(Config.ADMIN))
 async def handle_yt_dl(bot: Client, cmd: Message):
@@ -178,4 +189,3 @@ async def handle_multiple_download(bot: Client, update: CallbackQuery):
             await downloader.download_multiple(bot, update, links_msg)
         except Exception as e:
             print(f'Error on line {sys.exc_info()[-1].tb_lineno}: {type(e).__name__} - {e}')
-
