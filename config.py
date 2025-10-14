@@ -26,8 +26,8 @@ class Config(object):
     LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1001870015374"))  # ⚠️ Required
     
     # Mega User Account ⚠️ Only Set When you have Pro or Enterprise Mega Account
-    MEGA_EMAIL = os.environ.get("MEGA_EMAIL", "ak14147800@gmail.com")
-    MEGA_PASSWORD = os.environ.get("MEGA_PASSWORD", "thakur#12")
+    MEGA_EMAIL = os.environ.get("MEGA_EMAIL", None)
+    MEGA_PASSWORD = os.environ.get("MEGA_PASSWORD", None)
     
     # Web response configuration
     WEBHOOK = bool(os.environ.get("WEBHOOK", True))

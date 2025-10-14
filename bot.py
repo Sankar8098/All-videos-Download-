@@ -18,9 +18,14 @@ from helper.utils import (
     get_porn_thumbnail_url,
     progress_for_pyrogram,
 )
+from mega import Mega
 
 import nest_asyncio
 nest_asyncio.apply()
+
+
+mega = Mega()
+m = mega.login(Config.MEGA_EMAIL, Config.MEGA_PASSWORD)
 
 
 def get_video_duration(file_path):
@@ -158,6 +163,25 @@ async def start_bot():
             await downloader.download_multiple(bot, message, message)
         else:
             await message.reply_text("Please send a valid link.")
+
+    @bot.on_message(filters.command(["mega"]))
+    async def mega_upload(_, message: Message):
+        if not Config.MEGA_EMAIL or not Config.MEGA_PASSWORD:
+            await message.reply_text("Mega credentials not configured.")
+            return
+        if not message.reply_to_message or not message.reply_to_message.document:
+            await message.reply_text("Please reply to a file to upload to Mega.")
+            return
+
+        file = await message.reply_to_message.download()
+        msg = await message.reply_text("Uploading to Mega... Please wait.")
+        try:
+            upload = m.upload(file)
+            await msg.edit(f"File uploaded to Mega: {m.get_upload_link(upload)}")
+        except Exception as e:
+            await msg.edit(f"Error uploading to Mega: {e}")
+        finally:
+            os.remove(file)
 
     while True:
         await asyncio.sleep(60)
